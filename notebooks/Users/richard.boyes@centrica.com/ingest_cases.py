@@ -1,4 +1,16 @@
 # Databricks notebook source
+# MAGIC %md
+# MAGIC ## Query the COVID19 API and retrieve data
+# MAGIC 
+# MAGIC We swiped most of this code from the government COVID data API
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC select count(*) from covid_sum
+
+# COMMAND ----------
+
 from typing import Iterable, Dict, Union, List
 from json import dumps
 from requests import get
@@ -98,7 +110,7 @@ from pyspark.sql.types import StringType,BooleanType,DateType
 # Get the JSON data and convert it to a spark dataframe
 
 query_filters = [
-    f"areaType=region"
+    f"areaType=ltla"
 ]
 
 query_structure = {
@@ -116,10 +128,6 @@ sdf_covid = spark.createDataFrame(json_data).withColumn("date", col("date").cast
 
 # COMMAND ----------
 
-
-
-# COMMAND ----------
-
 # Chuck it into the deltalake as a managed table
 
 sdf_covid.write \
@@ -132,3 +140,35 @@ sdf_covid.write \
 
 # COMMAND ----------
 
+from delta.tables import *
+
+dl = DeltaTable.forName(spark, 'covid_sum')
+
+display(dl.history())
+
+# COMMAND ----------
+
+display(sdf_covid.groupBy("name").sum("daily").withColumnRenamed("sum(daily)", "sum"))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Structured streaming group by
+# MAGIC 
+# MAGIC We use a group by and structured streaming to get out the grand total of covid cases for each city
+
+# COMMAND ----------
+
+spark.readStream \
+  .format("delta") \
+  .option("ignoreChanges", "True") \
+  .table('covid') \
+  .groupBy("name") \
+  .sum("daily") \
+  .withColumnRenamed("sum(daily)", "sum") \
+  .writeStream \
+  .trigger(once=True) \
+  .format("delta") \
+  .option("checkpointLocation", "/mnt/deltalake/covid_sum/_checkpoint") \
+  .outputMode("complete") \
+  .table("covid_sum")
