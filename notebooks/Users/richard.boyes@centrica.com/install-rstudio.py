@@ -15,7 +15,7 @@ if [[ ! -f "$RSTUDIO_BIN" && $DB_IS_DRIVER = "TRUE" ]]; then
   apt-get -o Acquire::http::proxy=false install -y gdebi-core
   cd /tmp
   # You can find new releases at https://rstudio.com/products/rstudio/download-server/debian-ubuntu/.
-  wget wget https://download2.rstudio.org/server/bionic/amd64/rstudio-server-1.3.1093-amd64.deb
+  wget https://download2.rstudio.org/server/bionic/amd64/rstudio-server-1.3.1093-amd64.deb
   sudo gdebi rstudio-server-1.3.1093-amd64.deb
   rstudio-server restart || true
 fi
